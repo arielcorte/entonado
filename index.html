@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entonado · Vocal Pitch Trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Spline+Sans+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B1B1E;
+    --panel:#10262A;
+    --panel-2:#0E2124;
+    --line:#1C3A3E;
+    --text:#D9E6E4;
+    --muted:#6E8A87;
+    --gold:#F5B942;      /* in tune */
+    --flat:#6FB4D8;      /* below pitch */
+    --sharp:#E8735A;     /* above pitch */
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Archivo',system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    display:flex;flex-direction:column;align-items:center;
+    padding:16px 14px 40px;
+  }
+  .app{width:100%;max-width:560px}
+
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:14px}
+  h1{font-size:26px;font-weight:800;letter-spacing:-0.02em}
+  h1 .dot{color:var(--gold)}
+  .notation-toggle{
+    display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;
+    font-size:12px;font-weight:700;
+  }
+  .notation-toggle button{
+    background:none;border:none;color:var(--muted);padding:6px 12px;cursor:pointer;
+    font-family:inherit;font-weight:700;font-size:12px;
+  }
+  .notation-toggle button.active{background:var(--gold);color:#1A1408}
+
+  .tabs{display:flex;gap:6px;margin-bottom:14px}
+  .tabs button{
+    flex:1;background:var(--panel);border:1px solid var(--line);color:var(--muted);
+    padding:10px 6px;border-radius:10px;font-family:inherit;font-weight:700;font-size:13px;
+    cursor:pointer;transition:all .15s;
+  }
+  .tabs button.active{color:var(--text);border-color:var(--gold);background:var(--panel-2)}
+  .tabs button:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+  .hidden{display:none !important}
+
+  /* readout */
+  .readout{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:10px;min-height:64px}
+  .note-big{font-size:56px;font-weight:800;line-height:1;letter-spacing:-0.02em}
+  .note-big small{font-size:22px;color:var(--muted);font-weight:700}
+  .cents-read{font-family:'Spline Sans Mono',monospace;text-align:right}
+  .cents-read .val{font-size:28px;font-weight:600;line-height:1}
+  .cents-read .lbl{font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+  .in-tune .val{color:var(--gold)}
+  .is-flat .val{color:var(--flat)}
+  .is-sharp .val{color:var(--sharp)}
+
+  canvas.lane{width:100%;height:220px;display:block;border-radius:10px;background:var(--panel-2);border:1px solid var(--line)}
+
+  .status{font-size:12px;color:var(--muted);margin-top:8px;font-family:'Spline Sans Mono',monospace}
+  .status b{color:var(--text);font-weight:600}
+
+  .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+  .btn{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    font-family:inherit;font-weight:700;font-size:14px;padding:11px 16px;border-radius:10px;
+    cursor:pointer;transition:transform .06s, background .15s;
+  }
+  .btn:active{transform:scale(.97)}
+  .btn.primary{background:var(--gold);color:#1A1408;border-color:var(--gold)}
+  .btn.mic-on{border-color:var(--gold);color:var(--gold)}
+  select{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    font-family:'Spline Sans Mono',monospace;font-size:14px;padding:10px 8px;border-radius:10px;
+  }
+  label.ctl{font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:4px;
+    letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+
+  /* note picker */
+  .note-strip{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:12px}
+  .note-strip button{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--muted);
+    font-family:'Spline Sans Mono',monospace;font-size:11px;padding:9px 0;border-radius:7px;cursor:pointer;
+  }
+  .note-strip button.sel{background:var(--gold);color:#1A1408;border-color:var(--gold);font-weight:600}
+
+  /* hold progress */
+  .hold-wrap{margin-top:12px}
+  .hold-bar{height:10px;background:var(--panel-2);border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .hold-fill{height:100%;width:0%;background:var(--gold);border-radius:999px;transition:width .1s linear}
+  .hold-lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:5px;
+    font-family:'Spline Sans Mono',monospace}
+  .hold-lbl b{color:var(--gold)}
+
+  /* quiz */
+  .quiz-answers{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+  .quiz-answers button{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    font-family:inherit;font-weight:700;font-size:15px;padding:14px 4px;border-radius:10px;cursor:pointer;
+  }
+  .quiz-answers button.correct{background:var(--gold);color:#1A1408;border-color:var(--gold)}
+  .quiz-answers button.wrong{background:var(--sharp);color:#1A0D08;border-color:var(--sharp)}
+  .quiz-answers button:disabled{opacity:.85}
+  .quiz-score{display:flex;gap:18px;margin-top:12px;font-family:'Spline Sans Mono',monospace;font-size:13px;color:var(--muted)}
+  .quiz-score b{color:var(--text)}
+  .quiz-msg{margin-top:10px;font-size:14px;min-height:20px}
+  .quiz-msg.good{color:var(--gold)}
+  .quiz-msg.bad{color:var(--sharp)}
+
+  .hint{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:10px}
+
+  .flash{animation:flash .5s ease}
+  @keyframes flash{0%{box-shadow:0 0 0 0 rgba(245,185,66,.7)}100%{box-shadow:0 0 0 22px rgba(245,185,66,0)}}
+  @media (prefers-reduced-motion:reduce){
+    .flash{animation:none}
+    *{transition:none !important}
+  }
+  @media (max-width:420px){
+    .note-big{font-size:44px}
+    .note-strip{grid-template-columns:repeat(6,1fr)}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Entonado<span class="dot">.</span></h1>
+    <div class="notation-toggle" role="group" aria-label="Note names">
+      <button id="notSolfa" class="active">Do Re Mi</button>
+      <button id="notLetters">C D E</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button id="tabTuner" class="active">Tuner</button>
+    <button id="tabMatch">Match the note</button>
+    <button id="tabQuiz">Ear quiz</button>
+  </div>
+
+  <!-- ============ TUNER ============ -->
+  <section id="viewTuner" class="panel">
+    <div class="readout" id="tunerReadout">
+      <div class="note-big" id="tunerNote">–<small></small></div>
+      <div class="cents-read"><div class="val" id="tunerCents">0</div><div class="lbl">cents</div></div>
+    </div>
+    <canvas class="lane" id="tunerLane"></canvas>
+    <div class="controls">
+      <button class="btn primary" id="tunerMicBtn">🎤 Start mic</button>
+    </div>
+    <div class="status" id="tunerStatus">Mic off. Press start and sing any note — you'll see which note you're producing and how far off you are.</div>
+  </section>
+
+  <!-- ============ MATCH ============ -->
+  <section id="viewMatch" class="panel hidden">
+    <div class="readout" id="matchReadout">
+      <div class="note-big"><span id="matchTargetName">Do</span><small id="matchTargetOct">3</small></div>
+      <div class="cents-read"><div class="val" id="matchCents">–</div><div class="lbl">cents off</div></div>
+    </div>
+    <canvas class="lane" id="matchLane"></canvas>
+
+    <div class="hold-wrap">
+      <div class="hold-bar"><div class="hold-fill" id="holdFill"></div></div>
+      <div class="hold-lbl"><span>hold it steady in the gold zone</span><span>hits: <b id="matchHits">0</b></span></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn primary" id="matchPlayBtn">▶ Play note</button>
+      <button class="btn" id="matchMicBtn">🎤 Start mic</button>
+      <label class="ctl">Octave
+        <select id="matchOctave">
+          <option>2</option><option selected>3</option><option>4</option><option>5</option>
+        </select>
+      </label>
+      <label class="ctl">Tolerance
+        <select id="matchTol">
+          <option value="30">±30 easy</option>
+          <option value="20" selected>±20 normal</option>
+          <option value="10">±10 strict</option>
+        </select>
+      </label>
+      <button class="btn" id="matchRandomBtn">🎲 Random</button>
+    </div>
+    <div class="note-strip" id="matchNoteStrip"></div>
+    <div class="status" id="matchStatus">Pick a note, play it, then sing it back. Hold within tolerance for 1.5 s to score a hit.</div>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section id="viewQuiz" class="panel hidden">
+    <div class="readout">
+      <div class="note-big" style="font-size:30px">Which note is it?</div>
+      <div class="cents-read"><div class="val" id="quizStreak" style="color:var(--gold)">0</div><div class="lbl">streak</div></div>
+    </div>
+    <p class="hint" style="margin-top:0">You'll hear the reference <b id="quizRefLbl">Do</b> first, then a mystery note from the major scale. Name it.</p>
+    <div class="controls">
+      <button class="btn primary" id="quizNewBtn">▶ New question</button>
+      <button class="btn" id="quizReplayBtn">↻ Replay</button>
+      <label class="ctl">Key
+        <select id="quizKey"></select>
+      </label>
+    </div>
+    <div class="quiz-answers" id="quizAnswers"></div>
+    <div class="quiz-msg" id="quizMsg"></div>
+    <div class="quiz-score">
+      <span>correct: <b id="quizRight">0</b></span>
+      <span>total: <b id="quizTotal">0</b></span>
+      <span>accuracy: <b id="quizAcc">–</b></span>
+    </div>
+  </section>
+
+  <p class="hint">Tip: use headphones so the mic only hears your voice. If the mic doesn't start here, download this file and open it in your browser (Chrome/Firefox) — some in-app previews block microphone access.</p>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ---------- notation ---------- */
+  const LETTERS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const SOLFA   = ['Do','Do#','Re','Re#','Mi','Fa','Fa#','Sol','Sol#','La','La#','Si'];
+  let useSolfa = true;
+  const noteName = pc => (useSolfa ? SOLFA[pc] : LETTERS[pc]);
+
+  const midiToFreq = m => 440 * Math.pow(2, (m - 69) / 12);
+  const freqToMidiFloat = f => 69 + 12 * Math.log2(f / 440);
+
+  /* ---------- audio ---------- */
+  let ctx = null;
+  function audioCtx(){
+    if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if(ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+  function playTone(freq, dur, when){
+    const ac = audioCtx();
+    const t0 = (when !== undefined ? when : ac.currentTime) + 0.02;
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(0.28, t0 + 0.04);
+    gain.gain.setValueAtTime(0.28, t0 + dur - 0.10);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(gain).connect(ac.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.05);
+    return t0 + dur;
+  }
+
+  /* ---------- mic + pitch detection ---------- */
+  let micStream = null, analyser = null, micBuf = null, micActive = false;
+  async function startMic(){
+    if(micActive) return true;
+    try{
+      micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+    }catch(e){
+      try{ micStream = await navigator.mediaDevices.getUserMedia({audio:true}); }
+      catch(e2){ return false; }
+    }
+    const ac = audioCtx();
+    const src = ac.createMediaStreamSource(micStream);
+    analyser = ac.createAnalyser();
+    analyser.fftSize = 2048;
+    micBuf = new Float32Array(analyser.fftSize);
+    src.connect(analyser);
+    micActive = true;
+    return true;
+  }
+
+  /* ACF2+ autocorrelation (Chris Wilson-style) */
+  function autoCorrelate(buf, sampleRate){
+    let SIZE = buf.length, rms = 0;
+    for(let i=0;i<SIZE;i++){ const v=buf[i]; rms += v*v; }
+    rms = Math.sqrt(rms/SIZE);
+    if(rms < 0.01) return -1;
+    let r1=0, r2=SIZE-1;
+    const thres=0.2;
+    for(let i=0;i<SIZE/2;i++) if(Math.abs(buf[i])<thres){ r1=i; break; }
+    for(let i=1;i<SIZE/2;i++) if(Math.abs(buf[SIZE-i])<thres){ r2=SIZE-i; break; }
+    const b = buf.slice(r1,r2);
+    SIZE = b.length;
+    if(SIZE < 32) return -1;
+    const c = new Float32Array(SIZE);
+    for(let i=0;i<SIZE;i++){
+      let s=0;
+      for(let j=0;j<SIZE-i;j++) s += b[j]*b[j+i];
+      c[i]=s;
+    }
+    let d=0;
+    while(d<SIZE-1 && c[d]>c[d+1]) d++;
+    let maxval=-1, maxpos=-1;
+    for(let i=d;i<SIZE;i++){ if(c[i]>maxval){ maxval=c[i]; maxpos=i; } }
+    if(maxpos<=0) return -1;
+    let T0 = maxpos;
+    const x1=c[T0-1]||0, x2=c[T0], x3=c[T0+1]||0;
+    const a=(x1+x3-2*x2)/2, bb=(x3-x1)/2;
+    if(a) T0 = T0 - bb/(2*a);
+    const f = sampleRate/T0;
+    if(f < 60 || f > 1400) return -1;
+    return f;
+  }
+
+  /* median smoothing over recent detections */
+  const recent = [];
+  function smoothedPitch(f){
+    recent.push(f);
+    if(recent.length > 5) recent.shift();
+    const s = [...recent].sort((a,b)=>a-b);
+    return s[Math.floor(s.length/2)];
+  }
+
+  /* ---------- lane rendering ---------- */
+  function makeLane(canvas, tolProvider){
+    const trail = []; // {t, cents}
+    function draw(cents, inTune){
+      const dpr = window.devicePixelRatio || 1;
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      if(canvas.width !== w*dpr){ canvas.width = w*dpr; canvas.height = h*dpr; }
+      const g = canvas.getContext('2d');
+      g.setTransform(dpr,0,0,dpr,0,0);
+      g.clearRect(0,0,w,h);
+      const now = performance.now();
+      const SPAN = 5000; // ms of history
+      const RANGE = 60;  // ±cents shown
+      const yOf = c => h/2 - (Math.max(-RANGE,Math.min(RANGE,c))/RANGE)*(h/2 - 12);
+
+      // tolerance band
+      const tol = tolProvider();
+      g.fillStyle = 'rgba(245,185,66,0.10)';
+      const yT = yOf(tol), yB = yOf(-tol);
+      g.fillRect(0, yT, w, yB - yT);
+
+      // grid
+      g.strokeStyle = 'rgba(110,138,135,0.25)';
+      g.lineWidth = 1;
+      [[-50,'-50'],[-25,'-25'],[25,'+25'],[50,'+50']].forEach(([c,lbl])=>{
+        const y = yOf(c);
+        g.beginPath(); g.moveTo(0,y); g.lineTo(w,y); g.stroke();
+        g.fillStyle = 'rgba(110,138,135,0.55)';
+        g.font = '10px "Spline Sans Mono", monospace';
+        g.fillText(lbl, 6, y-3);
+      });
+
+      // target line (0 cents)
+      g.strokeStyle = '#F5B942';
+      g.lineWidth = 1.5;
+      g.setLineDash([5,4]);
+      g.beginPath(); g.moveTo(0, yOf(0)); g.lineTo(w, yOf(0)); g.stroke();
+      g.setLineDash([]);
+
+      // push sample
+      if(cents !== null) trail.push({t: now, c: cents});
+      while(trail.length && now - trail[0].t > SPAN) trail.shift();
+
+      // trail path
+      if(trail.length > 1){
+        g.lineWidth = 2.5;
+        g.lineJoin = 'round';
+        for(let i=1;i<trail.length;i++){
+          const p0 = trail[i-1], p1 = trail[i];
+          if(p1.t - p0.t > 300) continue; // gap in singing
+          const x0 = w - ((now - p0.t)/SPAN)*w;
+          const x1 = w - ((now - p1.t)/SPAN)*w;
+          const within = Math.abs(p1.c) <= tol;
+          g.strokeStyle = within ? '#F5B942' : (p1.c > 0 ? '#E8735A' : '#6FB4D8');
+          g.globalAlpha = 0.35 + 0.65*(1-(now-p1.t)/SPAN);
+          g.beginPath();
+          g.moveTo(x0, yOf(p0.c));
+          g.lineTo(x1, yOf(p1.c));
+          g.stroke();
+        }
+        g.globalAlpha = 1;
+      }
+
+      // current orb
+      if(cents !== null){
+        const y = yOf(cents);
+        g.beginPath();
+        g.arc(w-14, y, 7, 0, Math.PI*2);
+        g.fillStyle = inTune ? '#F5B942' : (cents > 0 ? '#E8735A' : '#6FB4D8');
+        g.shadowColor = g.fillStyle;
+        g.shadowBlur = 14;
+        g.fill();
+        g.shadowBlur = 0;
+      }
+    }
+    return { draw };
+  }
+
+  /* ---------- tabs & notation ---------- */
+  const views = {tuner: viewTuner, match: viewMatch, quiz: viewQuiz};
+  const tabs = {tuner: tabTuner, match: tabMatch, quiz: tabQuiz};
+  let mode = 'tuner';
+  function setMode(m){
+    mode = m;
+    for(const k in views){
+      views[k].classList.toggle('hidden', k!==m);
+      tabs[k].classList.toggle('active', k===m);
+    }
+  }
+  tabTuner.onclick = ()=>setMode('tuner');
+  tabMatch.onclick = ()=>setMode('match');
+  tabQuiz.onclick  = ()=>setMode('quiz');
+
+  function refreshNames(){
+    buildNoteStrip();
+    updateMatchTargetLabel();
+    buildQuizKeys();
+    buildQuizAnswers();
+    quizRefLbl.textContent = noteName(quizKeyPc);
+  }
+  notSolfa.onclick = ()=>{ useSolfa=true; notSolfa.classList.add('active'); notLetters.classList.remove('active'); refreshNames(); };
+  notLetters.onclick = ()=>{ useSolfa=false; notLetters.classList.add('active'); notSolfa.classList.remove('active'); refreshNames(); };
+
+  /* ---------- shared mic loop ---------- */
+  const tunerLaneR = makeLane(tunerLane, ()=>10);
+  const matchLaneR = makeLane(matchLane, ()=>parseInt(matchTol.value,10));
+
+  let holdStart = null;
+  const HOLD_MS = 1500;
+  let hits = 0;
+
+  function loop(){
+    requestAnimationFrame(loop);
+    if(!micActive || !analyser) return;
+    analyser.getFloatTimeDomainData(micBuf);
+    const raw = autoCorrelate(micBuf, ctx.sampleRate);
+
+    if(raw === -1){
+      recent.length = 0;
+      if(mode==='tuner'){
+        tunerLaneR.draw(null,false);
+        tunerNote.innerHTML = '–<small></small>';
+        tunerCents.textContent = '·';
+        tunerReadout.className = 'readout';
+      } else if(mode==='match'){
+        matchLaneR.draw(null,false);
+        matchCents.textContent = '·';
+        matchReadout.className = 'readout';
+        holdStart = null; holdFill.style.width = '0%';
+      }
+      return;
+    }
+    const f = smoothedPitch(raw);
+
+    if(mode === 'tuner'){
+      const mf = freqToMidiFloat(f);
+      const m = Math.round(mf);
+      const cents = (mf - m) * 100;
+      const pc = ((m % 12) + 12) % 12;
+      const oct = Math.floor(m/12) - 1;
+      const inTune = Math.abs(cents) <= 10;
+      tunerNote.innerHTML = noteName(pc) + '<small>' + oct + '</small>';
+      tunerCents.textContent = (cents>0?'+':'') + cents.toFixed(0);
+      tunerReadout.className = 'readout ' + (inTune?'in-tune':(cents>0?'is-sharp':'is-flat'));
+      tunerLaneR.draw(cents, inTune);
+    }
+    else if(mode === 'match'){
+      const cents = 1200 * Math.log2(f / targetFreq());
+      if(Math.abs(cents) > 350){ // singing a totally different note / octave: show but clamp
+        matchLaneR.draw(cents>0?60:-60,false);
+        matchCents.textContent = cents>0 ? '≫' : '≪';
+        matchReadout.className = 'readout ' + (cents>0?'is-sharp':'is-flat');
+        holdStart = null; holdFill.style.width = '0%';
+        return;
+      }
+      const tol = parseInt(matchTol.value,10);
+      const inTune = Math.abs(cents) <= tol;
+      matchCents.textContent = (cents>0?'+':'') + cents.toFixed(0);
+      matchReadout.className = 'readout ' + (inTune?'in-tune':(cents>0?'is-sharp':'is-flat'));
+      matchLaneR.draw(cents, inTune);
+
+      const now = performance.now();
+      if(inTune){
+        if(holdStart === null) holdStart = now;
+        const p = Math.min(1,(now - holdStart)/HOLD_MS);
+        holdFill.style.width = (p*100).toFixed(0) + '%';
+        if(p >= 1){
+          hits++;
+          matchHits.textContent = hits;
+          holdStart = null;
+          holdFill.style.width = '0%';
+          viewMatch.classList.remove('flash'); void viewMatch.offsetWidth;
+          viewMatch.classList.add('flash');
+          matchStatus.innerHTML = '<b>¡Eso! Nailed it.</b> Hold it again or try another note.';
+        }
+      } else {
+        holdStart = null;
+        holdFill.style.width = '0%';
+      }
+    }
+  }
+  requestAnimationFrame(loop);
+
+  async function micButton(btn, statusEl){
+    const ok = await startMic();
+    if(ok){
+      btn.textContent = '🎤 Mic on';
+      btn.classList.add('mic-on');
+      tunerMicBtn.textContent = '🎤 Mic on'; tunerMicBtn.classList.add('mic-on');
+      matchMicBtn.textContent = '🎤 Mic on'; matchMicBtn.classList.add('mic-on');
+      statusEl.innerHTML = 'Mic <b>listening</b>. Sing!';
+    } else {
+      statusEl.innerHTML = '<b>Mic blocked.</b> Allow microphone access, or download this file and open it directly in your browser.';
+    }
+  }
+  tunerMicBtn.onclick = ()=>micButton(tunerMicBtn, tunerStatus);
+  matchMicBtn.onclick = ()=>micButton(matchMicBtn, matchStatus);
+
+  /* ---------- MATCH mode state ---------- */
+  let matchPc = 0; // pitch class
+  const targetMidi = ()=> (parseInt(matchOctave.value,10)+1)*12 + matchPc;
+  const targetFreq = ()=> midiToFreq(targetMidi());
+
+  function buildNoteStrip(){
+    matchNoteStrip.innerHTML = '';
+    for(let pc=0; pc<12; pc++){
+      const b = document.createElement('button');
+      b.textContent = noteName(pc);
+      if(pc===matchPc) b.classList.add('sel');
+      b.onclick = ()=>{
+        matchPc = pc;
+        [...matchNoteStrip.children].forEach((el,i)=>el.classList.toggle('sel', i===pc));
+        updateMatchTargetLabel();
+        playTone(targetFreq(), 1.0);
+      };
+      matchNoteStrip.appendChild(b);
+    }
+  }
+  function updateMatchTargetLabel(){
+    matchTargetName.textContent = noteName(matchPc);
+    matchTargetOct.textContent = matchOctave.value;
+  }
+  matchOctave.onchange = updateMatchTargetLabel;
+  matchPlayBtn.onclick = ()=>playTone(targetFreq(), 1.4);
+  matchRandomBtn.onclick = ()=>{
+    matchPc = Math.floor(Math.random()*12);
+    [...matchNoteStrip.children].forEach((el,i)=>el.classList.toggle('sel', i===matchPc));
+    updateMatchTargetLabel();
+    playTone(targetFreq(), 1.4);
+  };
+
+  /* ---------- QUIZ mode ---------- */
+  const DEGREES = [0,2,4,5,7,9,11,12];
+  const DEG_SOLFA = ['Do','Re','Mi','Fa','Sol','La','Si',"Do'"];
+  const DEG_LETT_OF = pc => { // names relative to key using pitch classes
+    return DEGREES.map(iv => LETTERS[(pc+iv)%12] + (iv===12?"'":''));
+  };
+  let quizKeyPc = 0;       // tonic pitch class (octave 4)
+  let quizAnswerIdx = null;
+  let quizRight = 0, quizTotal = 0, quizStreakN = 0;
+  let quizLocked = true;
+
+  function buildQuizKeys(){
+    const cur = quizKey.value;
+    quizKey.innerHTML = '';
+    for(let pc=0; pc<12; pc++){
+      const o = document.createElement('option');
+      o.value = pc;
+      o.textContent = noteName(pc);
+      quizKey.appendChild(o);
+    }
+    quizKey.value = cur !== '' && cur !== undefined && cur !== null && cur !== '' ? (cur||0) : 0;
+    if(quizKey.selectedIndex < 0) quizKey.value = 0;
+  }
+  function buildQuizAnswers(){
+    quizAnswers.innerHTML = '';
+    const names = useSolfa ? DEG_SOLFA : DEG_LETT_OF(quizKeyPc);
+    names.forEach((nm, i)=>{
+      const b = document.createElement('button');
+      b.textContent = nm;
+      b.disabled = quizLocked;
+      b.onclick = ()=>answerQuiz(i, b);
+      quizAnswers.appendChild(b);
+    });
+  }
+  function quizTonicMidi(){ return 60 + quizKeyPc; } // around C4
+  function playQuizQuestion(){
+    const ac = audioCtx();
+    let t = ac.currentTime;
+    t = playTone(midiToFreq(quizTonicMidi()), 0.7, t);
+    playTone(midiToFreq(quizTonicMidi() + DEGREES[quizAnswerIdx]), 1.0, t + 0.25);
+  }
+  quizNewBtn.onclick = ()=>{
+    quizAnswerIdx = Math.floor(Math.random()*DEGREES.length);
+    quizLocked = false;
+    quizMsg.textContent = '';
+    quizMsg.className = 'quiz-msg';
+    buildQuizAnswers();
+    playQuizQuestion();
+  };
+  quizReplayBtn.onclick = ()=>{ if(quizAnswerIdx!==null) playQuizQuestion(); };
+  quizKey.onchange = ()=>{
+    quizKeyPc = parseInt(quizKey.value,10);
+    quizRefLbl.textContent = noteName(quizKeyPc);
+    buildQuizAnswers();
+  };
+  function answerQuiz(i, btn){
+    if(quizLocked) return;
+    quizLocked = true;
+    quizTotal++;
+    const names = useSolfa ? DEG_SOLFA : DEG_LETT_OF(quizKeyPc);
+    if(i === quizAnswerIdx){
+      quizRight++; quizStreakN++;
+      btn.classList.add('correct');
+      quizMsg.textContent = '¡Bien! That was ' + names[i] + '.';
+      quizMsg.className = 'quiz-msg good';
+    } else {
+      quizStreakN = 0;
+      btn.classList.add('wrong');
+      quizAnswers.children[quizAnswerIdx].classList.add('correct');
+      quizMsg.textContent = 'It was ' + names[quizAnswerIdx] + '. Replay it and listen again.';
+      quizMsg.className = 'quiz-msg bad';
+    }
+    [...quizAnswers.children].forEach(b=>b.disabled=true);
+    quizStreak.textContent = quizStreakN;
+    document.getElementById('quizRight').textContent = quizRight;
+    quizTotalEl.textContent = quizTotal;
+    quizAcc.textContent = Math.round(100*quizRight/quizTotal) + '%';
+  }
+  const quizTotalEl = document.getElementById('quizTotal');
+
+  /* ---------- init ---------- */
+  buildNoteStrip();
+  updateMatchTargetLabel();
+  buildQuizKeys();
+  buildQuizAnswers();
+})();
+</script>
+</body>
+</html>
